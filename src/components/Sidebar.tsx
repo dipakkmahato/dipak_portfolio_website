@@ -1,10 +1,12 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import { queryOptions, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import profileImg from "@/assets/profile.jpg";
-import { profile } from "@/data/site";
+import { profile as fallbackProfile } from "@/data/site";
 import { ChevronUp, ChevronDown, Menu, X, Download, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { getCVInfoFn, getCVDownloadFn, type CVInfo } from "@/lib/cv.functions";
+import { getSiteContent } from "@/lib/site.functions";
 
 const NAV = [
   { id: "home", label: "HOME" },
@@ -18,9 +20,16 @@ const NAV = [
   { id: "contact", label: "CONTACT" },
 ];
 
+const siteQuery = queryOptions({
+  queryKey: ["site-content"],
+  queryFn: () => getSiteContent(),
+});
+
 export function Sidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const onHome = pathname === "/";
+  const { data: site } = useQuery(siteQuery);
+  const profile = site?.profile ?? fallbackProfile;
   const [active, setActive] = useState("home");
   const [open, setOpen] = useState(false);
   const [cvInfo, setCvInfo] = useState<CVInfo | null>(null);

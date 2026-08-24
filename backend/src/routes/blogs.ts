@@ -1,7 +1,24 @@
 import express, { Request, Response } from "express";
 import mongoose from "mongoose";
+import { blogs as fallbackBlogs } from "../lib/fallback-site-data";
 
 const router = express.Router();
+
+async function waitForMongoConnection(timeoutMs = 15000) {
+  const state = Number(mongoose.connection.readyState);
+  if (state === 1) return true;
+  if (state !== 2) return false;
+
+  try {
+    await Promise.race([
+      mongoose.connection.asPromise(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("MongoDB connection timed out")), timeoutMs)),
+    ]);
+    return Number(mongoose.connection.readyState) === 1;
+  } catch {
+    return false;
+  }
+}
 
 type RawDoc = Record<string, unknown> & { _id: string };
 
@@ -32,28 +49,45 @@ function stripId(doc: RawDoc) {
   return rest;
 }
 
+function withFallbackBlogLinks(docs: RawDoc[]): Blog[] {
+  const bySlug = new Map(fallbackBlogs.map((blog) => [blog.slug, blog] as const));
+
+  return docs.map((doc) => {
+    const blog = stripId(doc) as Blog;
+    const fallback = bySlug.get(blog.slug);
+    return {
+      ...fallback,
+      ...blog,
+    };
+  });
+}
+
 router.get("/", async (_req: Request, res: Response) => {
   try {
     const docs = await collection<RawDoc>("blogs").find({}).toArray();
-    return res.json({ ok: true, blogs: toJSON(docs.map(stripId)) as Blog[] });
-  } catch (error) {
-    console.error("Failed to fetch blogs from MongoDB.", error);
-    return res.status(500).json({ ok: false, error: "Failed to fetch blogs" });
+    const blogs = toJSON(withFallbackBlogLinks(docs));
+    return res.json({ ok: true, blogs });
+  } catch {
+    return res.json({ ok: true, blogs: toJSON(fallbackBlogs) });
   }
 });
 
 router.get("/:slug", async (req: Request, res: Response) => {
   try {
     const doc = await collection<RawDoc>("blogs").findOne({ slug: req.params.slug });
-    if (!doc) {
-      return res.status(404).json({ ok: false, error: "Blog not found" });
+    if (doc) {
+      return res.json({ ok: true, blog: toJSON(stripId(doc)) as Blog });
     }
-
-    return res.json({ ok: true, blog: toJSON(stripId(doc)) as Blog });
-  } catch (error) {
-    console.error("Failed to fetch blog by slug from MongoDB.", error);
-    return res.status(500).json({ ok: false, error: "Failed to fetch blog" });
+  } catch {
+    // Fall through to the static fallback below.
   }
+
+  const fallback = fallbackBlogs.find((blog) => blog.slug === req.params.slug);
+  if (!fallback) {
+    return res.status(404).json({ ok: false, error: "Blog not found" });
+  }
+
+  return res.json({ ok: true, blog: toJSON(fallback) as Blog });
 });
 
 export default router;

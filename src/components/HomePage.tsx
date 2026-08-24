@@ -341,6 +341,7 @@ export default function HomePage() {
     blogUnits,
     serviceDetails,
   } = site;
+  const socialLinks = buildSocialLinks(profile.socials as Record<string, string> | undefined);
   const { webDev, webDesign, dataAnalysis, mobileApp } = serviceDetails;
 
   return (
@@ -654,51 +655,14 @@ export default function HomePage() {
       <footer className="border-t px-6 lg:px-16 py-10 text-center">
         <p className="font-display font-semibold mb-4">Follow Me</p>
         <div className="flex flex-wrap justify-center gap-6 text-muted-foreground">
-          {/* Website */}
-          <SocialButton
-            href="https://www.dipaksingh.com.np/"
-            label="Website"
-            icon={<Globe2 size={24} />}
-          />
-
-          {/* GitHub */}
-          <SocialButton
-            href="https://github.com/dipakkmahato"
-            label="GitHub"
-            icon={<Github size={24} />}
-          />
-
-          {/* LinkedIn */}
-          <SocialButton
-            href="https://www.linkedin.com/in/dipak-kumar-singh-591670294"
-            label="LinkedIn"
-            icon={<Linkedin size={24} />}
-          />
-
-          {/* Facebook */}
-          <SocialButton
-            href="https://www.facebook.com/Dipak.Singh.07"
-            label="Facebook"
-            icon={<Facebook size={24} />}
-          />
-
-          {/* YouTube */}
-          <SocialButton
-            href="https://www.youtube.com/@dipakkumarsingh2473"
-            label="YouTube"
-            icon={<Youtube size={24} />}
-          />
-
-          {/* TikTok */}
-          <SocialButton
-            href="https://www.tiktok.com/@dipak_singh099"
-            label="TikTok"
-            icon={
-              <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
-                <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
-              </svg>
-            }
-          />
+          {socialLinks.map((social) => (
+            <SocialButton
+              key={social.label}
+              href={social.href}
+              label={social.label}
+              icon={social.icon}
+            />
+          ))}
         </div>
 
         <p className="text-xs text-muted-foreground mt-8">
@@ -707,6 +671,16 @@ export default function HomePage() {
       </footer>
     </>
   );
+}
+
+type SocialLink = {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+};
+
+function isUsableHref(href: string | undefined | null) {
+  return Boolean(href && href !== "#");
 }
 
 function SocialButton({
@@ -735,6 +709,25 @@ function SocialButton({
       {icon}
     </button>
   );
+}
+
+function buildSocialLinks(socials: Record<string, string> | undefined | null): SocialLink[] {
+  return [
+    { href: socials?.portfolio ?? "", label: "Website", icon: <Globe2 size={24} /> },
+    { href: socials?.github ?? "", label: "GitHub", icon: <Github size={24} /> },
+    { href: socials?.linkedin ?? "", label: "LinkedIn", icon: <Linkedin size={24} /> },
+    { href: socials?.facebook ?? "", label: "Facebook", icon: <Facebook size={24} /> },
+    { href: socials?.youtube ?? "", label: "YouTube", icon: <Youtube size={24} /> },
+    {
+      href: socials?.twitter ?? "",
+      label: "TikTok",
+      icon: (
+        <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+          <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
+        </svg>
+      ),
+    },
+  ].filter((social) => isUsableHref(social.href));
 }
 
 function ContactInfo({

@@ -31,35 +31,45 @@ const upload = multer({
 });
 
 router.get("/", async (_req: Request, res: Response) => {
-  const doc = await CVModel.findById("cv");
-  if (!doc) {
-    return res.status(404).json({ ok: false, error: "No CV has been uploaded yet" });
-  }
+  try {
+    const doc = await CVModel.findById("cv");
+    if (!doc) {
+      return res.status(404).json({ ok: false, error: "No CV has been uploaded yet" });
+    }
 
-  return res.json({
-    ok: true,
-    cv: {
-      filename: doc.filename,
-      originalName: doc.originalName,
-      mimeType: doc.mimeType,
-      size: doc.size,
-      updatedAt: doc.updatedAt,
-    },
-    downloadUrl: "/api/cv/download",
-  });
+    return res.json({
+      ok: true,
+      cv: {
+        filename: doc.filename,
+        originalName: doc.originalName,
+        mimeType: doc.mimeType,
+        size: doc.size,
+        updatedAt: doc.updatedAt,
+      },
+      downloadUrl: "/api/cv/download",
+    });
+  } catch (error) {
+    console.error("Error retrieving CV:", error);
+    return res.status(500).json({ ok: false, error: "Failed to retrieve CV from database" });
+  }
 });
 
 router.get("/download", async (_req: Request, res: Response) => {
-  const doc = await CVModel.findById("cv");
-  if (!doc) {
-    return res.status(404).json({ ok: false, error: "No CV has been uploaded yet" });
-  }
+  try {
+    const doc = await CVModel.findById("cv");
+    if (!doc) {
+      return res.status(404).json({ ok: false, error: "No CV has been uploaded yet" });
+    }
 
-  const buffer = Buffer.from(doc.fileData, "base64");
-  res.setHeader("Content-Disposition", `attachment; filename="${doc.originalName}"`);
-  res.setHeader("Content-Type", doc.mimeType);
-  res.setHeader("Content-Length", buffer.length.toString());
-  return res.send(buffer);
+    const buffer = Buffer.from(doc.fileData, "base64");
+    res.setHeader("Content-Disposition", `attachment; filename="${doc.originalName}"`);
+    res.setHeader("Content-Type", doc.mimeType);
+    res.setHeader("Content-Length", buffer.length.toString());
+    return res.send(buffer);
+  } catch (error) {
+    console.error("Error downloading CV:", error);
+    return res.status(500).json({ ok: false, error: "Failed to download CV" });
+  }
 });
 
 router.post("/upload", requireAdmin, upload.single("file"), async (req: Request, res: Response) => {
@@ -67,31 +77,36 @@ router.post("/upload", requireAdmin, upload.single("file"), async (req: Request,
     return res.status(400).json({ error: "No file provided" });
   }
 
-  const updatedDoc = await CVModel.findByIdAndUpdate(
-    "cv",
-    {
-      filename: req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_"),
-      originalName: req.file.originalname,
-      mimeType: req.file.mimetype,
-      size: req.file.size,
-      fileData: req.file.buffer.toString("base64"),
-      updatedAt: new Date().toISOString(),
-    },
-    { upsert: true, new: true },
-  );
+  try {
+    const updatedDoc = await CVModel.findByIdAndUpdate(
+      "cv",
+      {
+        filename: req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_"),
+        originalName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        size: req.file.size,
+        fileData: req.file.buffer.toString("base64"),
+        updatedAt: new Date().toISOString(),
+      },
+      { upsert: true, new: true },
+    );
 
-  return res.json({
-    ok: true,
-    message: "Curriculum Vitae stored in MongoDB successfully",
-    cv: {
-      filename: updatedDoc.filename,
-      originalName: updatedDoc.originalName,
-      mimeType: updatedDoc.mimeType,
-      size: updatedDoc.size,
-      updatedAt: updatedDoc.updatedAt,
-    },
-    downloadUrl: "/api/cv/download",
-  });
+    return res.json({
+      ok: true,
+      message: "Curriculum Vitae stored in MongoDB successfully",
+      cv: {
+        filename: updatedDoc.filename,
+        originalName: updatedDoc.originalName,
+        mimeType: updatedDoc.mimeType,
+        size: updatedDoc.size,
+        updatedAt: updatedDoc.updatedAt,
+      },
+      downloadUrl: "/api/cv/download",
+    });
+  } catch (error) {
+    console.error("Error uploading CV:", error);
+    return res.status(500).json({ error: "Failed to upload CV to database" });
+  }
 });
 
 export default router;

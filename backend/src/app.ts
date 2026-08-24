@@ -8,6 +8,7 @@ import adminRouter from "./routes/admin";
 import blogsRouter from "./routes/blogs";
 import contactRouter from "./routes/contact";
 import cvRouter from "./routes/cv";
+import healthRouter from "./routes/health";
 import siteRouter from "./routes/site";
 
 const app = express();
@@ -27,7 +28,16 @@ const allowedOrigins = (process.env.FRONTEND_ORIGIN ?? "http://localhost:8080")
 // Middleware
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (
+        allowedOrigins.includes(origin) ||
+        /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+      ) {
+        return callback(null, true);
+      }
+      return callback(null, false);
+    },
     credentials: true,
   }),
 );
@@ -42,7 +52,6 @@ app.use("/api/blogs", blogsRouter);
 app.use("/api/contact", contactRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/cv", cvRouter);
+app.use("/api/health", healthRouter);
 
 export default app;
-
-
