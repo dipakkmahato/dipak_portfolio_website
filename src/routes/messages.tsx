@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Section } from "@/components/Section";
 import { getContactSubmissions, type ContactSubmission } from "@/lib/site.functions";
@@ -15,6 +15,13 @@ type MongoHealth = {
   error?: string;
   database?: string;
   host?: string;
+};
+
+type ApiHealth = {
+  reachable: boolean;
+  status?: number;
+  message: string;
+  checkedAt: string;
 };
 
 type AdminSiteResponse = { ok?: boolean; site?: unknown; error?: string };
@@ -54,17 +61,21 @@ function MessagesPage() {
   const [loadingBlogs, setLoadingBlogs] = useState(false);
   const [loadingMongoHealth, setLoadingMongoHealth] = useState(false);
   const [mongoHealth, setMongoHealth] = useState<MongoHealth | null>(null);
+  const [loadingApiHealth, setLoadingApiHealth] = useState(false);
+  const [apiHealth, setApiHealth] = useState<ApiHealth | null>(null);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [savingSite, setSavingSite] = useState(false);
   const [savingBlogs, setSavingBlogs] = useState(false);
   const [siteText, setSiteText] = useState("{}");
   const [blogsText, setBlogsText] = useState("[]");
+  const mongoHealthRef = useRef<MongoHealth | null>(null);
 
-  const loadMongoHealth = async () => {
-    setLoadingMongoHealth(true);
+  const loadMongoHealth = async (showLoading = true) => {
+    if (showLoading) setLoadingMongoHealth(true);
     try {
       const response = await fetch(`${API_BASE_URL}/api/health/mongo`);
       const data = (await response.json().catch(() => ({}))) as MongoHealth;
-      setMongoHealth({
+      const nextHealth: MongoHealth = {
         ok: response.ok && data.ok,
         connected: Boolean(data.connected),
         state: data.state ?? (response.ok ? "connected" : "disconnected"),
@@ -73,11 +84,41 @@ function MessagesPage() {
         error: data.error,
         database: data.database,
         host: data.host,
-      });
+      };
+      setMongoHealth(nextHealth);
+      return nextHealth;
     } catch {
-      setMongoHealth({ ok: false, connected: false, state: "unreachable", message: "Health check failed" });
+      const nextHealth: MongoHealth = { ok: false, connected: false, state: "unreachable", message: "Health check failed" };
+      setMongoHealth(nextHealth);
+      return nextHealth;
     } finally {
-      setLoadingMongoHealth(false);
+      if (showLoading) setLoadingMongoHealth(false);
+    }
+  };
+
+  const loadApiHealth = async (showLoading = true) => {
+    if (showLoading) setLoadingApiHealth(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/`);
+      const message = (await response.text().catch(() => "")).trim();
+      const nextHealth: ApiHealth = {
+        reachable: response.ok,
+        status: response.status,
+        message: message || (response.ok ? "API is running" : "API responded with an error"),
+        checkedAt: new Date().toISOString(),
+      };
+      setApiHealth(nextHealth);
+      return nextHealth;
+    } catch {
+      const nextHealth: ApiHealth = {
+        reachable: false,
+        message: "API is unreachable",
+        checkedAt: new Date().toISOString(),
+      };
+      setApiHealth(nextHealth);
+      return nextHealth;
+    } finally {
+      if (showLoading) setLoadingApiHealth(false);
     }
   };
   const loadSubmissions = async () => {
@@ -94,8 +135,8 @@ function MessagesPage() {
     }
   };
 
-  const loadSiteEditor = async () => {
-    setLoadingSite(true);
+  const loadSiteEditor = async (showLoading = true) => {
+    if (showLoading) setLoadingSite(true);
     setSiteError(null);
     setSiteMessage(null);
     try {
@@ -117,12 +158,12 @@ function MessagesPage() {
     } catch (err) {
       setSiteError(err instanceof Error ? err.message : "Failed to load site content");
     } finally {
-      setLoadingSite(false);
+      if (showLoading) setLoadingSite(false);
     }
   };
 
-  const loadBlogEditor = async () => {
-    setLoadingBlogs(true);
+  const loadBlogEditor = async (showLoading = true) => {
+    if (showLoading) setLoadingBlogs(true);
     setBlogError(null);
     setBlogMessage(null);
     try {
@@ -146,9 +187,13 @@ function MessagesPage() {
     } catch (err) {
       setBlogError(err instanceof Error ? err.message : "Failed to load blogs");
     } finally {
-      setLoadingBlogs(false);
+      if (showLoading) setLoadingBlogs(false);
     }
   };
+
+  useEffect(() => {
+    mongoHealthRef.current = mongoHealth;
+  }, [mongoHealth]);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -158,7 +203,7 @@ function MessagesPage() {
         if (response.ok && data.authenticated) {
           setUser(data.user ?? null);
           setAuthStatus("authenticated");
-          await Promise.all([loadSubmissions(), loadSiteEditor(), loadBlogEditor(), loadMongoHealth()]);
+          await Promise.all([loadSubmissions(), loadSiteEditor(), loadBlogEditor(), loadMongoHealth(), loadApiHealth()]);
         } else {
           setAuthStatus("unauthenticated");
         }
@@ -170,6 +215,32 @@ function MessagesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (authStatus !== "authenticated") return;
+
+    let cancelled = false;
+    const pollHealth = async () => {
+      const wasConnected = mongoHealthRef.current?.connected ?? false;
+      const nextMongoHealth = await loadMongoHealth(false);
+      void loadApiHealth(false);
+
+      if (!cancelled && !wasConnected && nextMongoHealth?.connected) {
+        void Promise.all([loadSiteEditor(false), loadBlogEditor(false)]);
+      }
+    };
+
+    void pollHealth();
+    const intervalId = window.setInterval(() => {
+      void pollHealth();
+    }, 30000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authStatus]);
+
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
@@ -177,6 +248,7 @@ function MessagesPage() {
     setBlogError(null);
     setSiteMessage(null);
     setBlogMessage(null);
+    setLoadingApiHealth(false);
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
@@ -190,7 +262,8 @@ function MessagesPage() {
       setAuthStatus("authenticated");
       setLoginForm({ username: "", password: "" });
       setMongoHealth(null);
-      await Promise.all([loadSubmissions(), loadSiteEditor(), loadBlogEditor(), loadMongoHealth()]);
+      setApiHealth(null);
+      await Promise.all([loadSubmissions(), loadSiteEditor(), loadBlogEditor(), loadMongoHealth(), loadApiHealth()]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
       setAuthStatus("unauthenticated");
@@ -204,6 +277,8 @@ function MessagesPage() {
       setUser(null);
       setSubmissions([]);
       setMongoHealth(null);
+      setApiHealth(null);
+      setShowDiagnostics(false);
       setSiteText("{}");
       setBlogsText("[]");
       setAuthStatus("unauthenticated");
@@ -294,7 +369,7 @@ function MessagesPage() {
               <span
                 title={mongoHealth?.message ?? "MongoDB health"}
                 className={[
-                  "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold",
+                  "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold",
                   loadingMongoHealth
                     ? "border-amber-500/30 bg-amber-500/10 text-amber-700"
                     : mongoHealth?.connected
@@ -308,6 +383,61 @@ function MessagesPage() {
             <button type="button" onClick={handleLogout} className="rounded-md border border-border/60 px-4 py-2 text-sm">Sign out</button>
           </div>
 
+          <section className={`rounded-xl border border-border/60 bg-card ${showDiagnostics ? "p-6" : "p-3"}`}>
+            <div className={showDiagnostics ? "flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between" : "flex flex-wrap items-center gap-2"}>
+              <div className={showDiagnostics ? undefined : "flex items-center gap-2"}>
+                <h2 className="font-display text-xl font-bold sm:text-2xl">Backend Diagnostics</h2>
+                {!showDiagnostics && <span className="text-[11px] text-muted-foreground">Live API, Mongo, and editor health</span>}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDiagnostics((prev) => !prev)}
+                className="rounded-full border border-border/60 px-3 py-1 text-[11px] font-semibold text-foreground transition-colors hover:border-[var(--link)] hover:text-[var(--link)]"
+              >
+                {showDiagnostics ? "Hide" : "Show"}
+              </button>
+            </div>
+            {!showDiagnostics ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className={["inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold", loadingApiHealth ? "border-amber-500/30 bg-amber-500/10 text-amber-700" : apiHealth?.reachable ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700" : "border-red-500/30 bg-red-500/10 text-red-700"].join(" ")}>{loadingApiHealth ? "API Checking" : apiHealth?.reachable ? "API Online" : "API Offline"}</span>
+                <span className={["inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold", loadingMongoHealth ? "border-amber-500/30 bg-amber-500/10 text-amber-700" : mongoHealth?.connected ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700" : "border-red-500/30 bg-red-500/10 text-red-700"].join(" ")}>{loadingMongoHealth ? "Mongo Checking" : mongoHealth?.connected ? "Mongo Online" : "Mongo Offline"}</span>
+                <span className={["inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold", loadingSite || loadingBlogs ? "border-amber-500/30 bg-amber-500/10 text-amber-700" : siteError || blogError ? "border-red-500/30 bg-red-500/10 text-red-700" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"].join(" ")}>{loadingSite || loadingBlogs ? "Editors Loading" : siteError || blogError ? "Editors Need Attention" : "Editors Ready"}</span>
+              </div>
+            ) : (
+              <div className="mt-4 grid gap-3 lg:grid-cols-3">
+                <div className="rounded-lg border border-border/60 bg-background/40 p-4">
+                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">API</p>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <p className="text-sm font-medium">Backend endpoint</p>
+                    <span className={["inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold", loadingApiHealth ? "border-amber-500/30 bg-amber-500/10 text-amber-700" : apiHealth?.reachable ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700" : "border-red-500/30 bg-red-500/10 text-red-700"].join(" ")}>{loadingApiHealth ? "Checking" : apiHealth?.reachable ? "Online" : "Offline"}</span>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">{apiHealth?.message ?? "No API status yet."}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{apiHealth?.checkedAt ? ("Checked " + new Date(apiHealth.checkedAt).toLocaleTimeString()) : "Waiting for first check."}</p>
+                </div>
+
+                <div className="rounded-lg border border-border/60 bg-background/40 p-4">
+                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">MongoDB</p>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <p className="text-sm font-medium">Database connection</p>
+                    <span className={["inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold", loadingMongoHealth ? "border-amber-500/30 bg-amber-500/10 text-amber-700" : mongoHealth?.connected ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700" : "border-red-500/30 bg-red-500/10 text-red-700"].join(" ")}>{loadingMongoHealth ? "Checking" : mongoHealth?.connected ? "Connected" : "Offline"}</span>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">{mongoHealth?.message ?? "No Mongo status yet."}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{mongoHealth?.state ? ("State: " + mongoHealth.state) : "Waiting for first check."}</p>
+                  {mongoHealth?.database && <p className="mt-1 text-xs text-muted-foreground">Database: {mongoHealth.database}</p>}
+                </div>
+
+                <div className="rounded-lg border border-border/60 bg-background/40 p-4">
+                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Editors</p>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <p className="text-sm font-medium">Site and blog content</p>
+                    <span className={["inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold", loadingSite || loadingBlogs ? "border-amber-500/30 bg-amber-500/10 text-amber-700" : siteError || blogError ? "border-red-500/30 bg-red-500/10 text-red-700" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-700"].join(" ")}>{loadingSite || loadingBlogs ? "Loading" : siteError || blogError ? "Needs attention" : "Ready"}</span>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">{siteError ? ("Site: " + siteError) : loadingSite ? "Site editor loading..." : "Site editor loaded."}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{blogError ? ("Blogs: " + blogError) : loadingBlogs ? "Blog editor loading..." : "Blog editor loaded."}</p>
+                </div>
+              </div>
+            )}
+          </section>
           <section className="rounded-xl border border-border/60 bg-card p-6">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
