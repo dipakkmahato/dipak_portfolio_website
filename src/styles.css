@@ -1,0 +1,157 @@
+@import "tailwindcss";
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-serif: "Cormorant Garamond", "Playfair Display", Georgia, serif;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar-bg: var(--sidebar-bg);
+  --color-eyebrow: var(--eyebrow);
+  --color-link: var(--link);
+
+  --color-skill-1: var(--skill-1);
+  --color-skill-2: var(--skill-2);
+  --color-skill-3: var(--skill-3);
+  --color-skill-4: var(--skill-4);
+  --color-skill-5: var(--skill-5);
+  --color-skill-6: var(--skill-6);
+}
+
+:root {
+  --radius: 0.75rem;
+
+  /* Deep navy with richer blue tones */
+  --background: oklch(0.15 0.06 265);
+  --foreground: oklch(0.97 0.01 250);
+  --card: oklch(0.2 0.07 265);
+  --card-foreground: oklch(0.97 0.01 250);
+  --popover: oklch(0.2 0.07 265);
+  --popover-foreground: oklch(0.97 0.01 250);
+
+  /* Vibrant gold/yellow accent */
+  --primary: oklch(0.82 0.18 80);
+  --primary-foreground: oklch(0.15 0.05 265);
+
+  --secondary: oklch(0.22 0.08 265);
+  --secondary-foreground: oklch(0.97 0.01 250);
+  --muted: oklch(0.25 0.07 265);
+  --muted-foreground: oklch(0.75 0.04 255);
+  --accent: oklch(0.28 0.08 265);
+  --accent-foreground: oklch(0.97 0.01 250);
+  --destructive: oklch(0.65 0.22 27);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.3 0.07 265 / 0.5);
+  --input: oklch(0.22 0.08 265);
+  --ring: oklch(0.82 0.18 80);
+
+  --sidebar-bg: oklch(0.13 0.05 265);
+  --eyebrow: oklch(0.82 0.18 80);
+  --link: oklch(0.82 0.18 80);
+
+  /* Brand gradient - brighter gold */
+  --grad-amber: linear-gradient(135deg, oklch(0.85 0.18 85), oklch(0.75 0.2 60));
+  --grad-bg: radial-gradient(ellipse at 70% 0%, oklch(0.28 0.14 265) 0%, oklch(0.13 0.05 265) 60%);
+  --shadow-glow: 0 10px 30px -10px oklch(0.75 0.2 60 / 0.4);
+
+  /* Section accents */
+  --skill-1: oklch(0.82 0.18 80); /* gold */
+  --skill-2: oklch(0.72 0.18 240); /* blue */
+  --skill-3: oklch(0.8 0.17 90); /* yellow */
+  --skill-4: oklch(0.72 0.2 145); /* green */
+  --skill-5: oklch(0.7 0.22 20); /* orange-red */
+  --skill-6: oklch(0.7 0.22 300); /* purple */
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  body {
+    background: var(--grad-bg);
+    background-attachment: fixed;
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+  }
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: var(--font-serif);
+    letter-spacing: 0.02em;
+  }
+  .eyebrow {
+    font-size: 0.7rem;
+    letter-spacing: 0.35em;
+    color: var(--color-eyebrow);
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .section-title {
+    font-family: var(--font-serif);
+    font-size: clamp(1.75rem, 3vw, 2.75rem);
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    background: var(--grad-amber);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+@keyframes float-text {
+  0%, 100% {
+    transform: translateY(0px);
+    filter: drop-shadow(0 2px 4px rgba(251, 191, 36, 0.2));
+  }
+  50% {
+    transform: translateY(-5px);
+    filter: drop-shadow(0 6px 12px rgba(251, 191, 36, 0.4));
+  }
+}
+
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 0.85;
+    box-shadow: 0 0 15px -3px rgba(251, 191, 36, 0.3);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 25px 2px rgba(251, 191, 36, 0.5);
+  }
+}
+
+.animate-float {
+  animation: float-text 2.8s ease-in-out infinite;
+}
+
+.cv-box-pulse {
+  animation: pulse-subtle 3.5s ease-in-out infinite;
+}
+
