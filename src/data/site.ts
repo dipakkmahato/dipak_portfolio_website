@@ -204,7 +204,7 @@ export const projects: Project[] = [
     tags: ["Reactjs", "Nodejs", "MongoDB", "Full-Stack"],
     services: ["Web Development"],
     cover: "/images/projects/do-you-love-me.jpg",
-    link: "https://doulovemedipaksingh.com.np",
+    link: "https://your-doyouloveme-app.netlify.app",
   },
   {
     title: "Dallotech",
