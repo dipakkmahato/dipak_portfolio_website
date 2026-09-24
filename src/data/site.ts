@@ -203,7 +203,7 @@ export const projects: Project[] = [
     type: "Website",
     tags: ["Reactjs", "Nodejs", "MongoDB", "Full-Stack"],
     services: ["Web Development"],
-    cover: "/images/projects/do-you-love-me.jpg",
+    link: "https://i.postimg.cc/76RR74LL/yeslme.jpg",
     link: "https://doyouloveme143.netlify.app/",
   },
   {
